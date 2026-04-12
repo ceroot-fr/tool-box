@@ -111,12 +111,87 @@
     
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#create-a-new-ip-packet-and-set-its-source-and-destination-addresses" class="nav-link">Create a new IP packet and set its source and destination addresses.</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            
+            <li class="nav-item" data-bs-level="1"><a href="#create-a-new-icmp-packet-of-type-echo" class="nav-link">Create a new ICMP packet of type ECHO.</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            
+            <li class="nav-item" data-bs-level="1"><a href="#include-a-156-character-long-payload-inside-the-icmp-packet" class="nav-link">Include a 156-character long payload inside the ICMP packet.</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            
+            <li class="nav-item" data-bs-level="1"><a href="#have-the-ip-packet-contain-the-icmp-packet-along-with-its-payload" class="nav-link">Have the IP packet contain the ICMP packet (along with its payload).</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            
+            <li class="nav-item" data-bs-level="1"><a href="#open-a-raw-socket-special-permissions-are-usually-required" class="nav-link">Open a raw socket. Special permissions are usually required.</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
         </ul>
     </div>
 </div></div>
                     <div class="col-md-9" role="main">
 
-</div>
+<p>import select
+import socket
+import time
+import sys</p>
+<p>from impacket import ImpactDecoder, ImpactPacket</p>
+<p>if len(sys.argv) &lt; 3:
+    print("Use: %s <src ip> <dst ip>" % sys.argv[0])
+    sys.exit(1)</p>
+<p>src = sys.argv[1]
+dst = sys.argv[2]</p>
+<h1 id="create-a-new-ip-packet-and-set-its-source-and-destination-addresses">Create a new IP packet and set its source and destination addresses.</h1>
+<p>ip = ImpactPacket.IP()
+ip.set_ip_src(src)
+ip.set_ip_dst(dst)</p>
+<h1 id="create-a-new-icmp-packet-of-type-echo">Create a new ICMP packet of type ECHO.</h1>
+<p>icmp = ImpactPacket.ICMP()
+icmp.set_icmp_type(icmp.ICMP_ECHO)</p>
+<h1 id="include-a-156-character-long-payload-inside-the-icmp-packet">Include a 156-character long payload inside the ICMP packet.</h1>
+<p>icmp.contains(ImpactPacket.Data(b"A"*156))</p>
+<h1 id="have-the-ip-packet-contain-the-icmp-packet-along-with-its-payload">Have the IP packet contain the ICMP packet (along with its payload).</h1>
+<p>ip.contains(icmp)</p>
+<h1 id="open-a-raw-socket-special-permissions-are-usually-required">Open a raw socket. Special permissions are usually required.</h1>
+<p>s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)</p>
+<p>seq_id = 0
+while 1:
+    # Give the ICMP packet the next ID in the sequence.
+    seq_id += 1
+    icmp.set_icmp_id(seq_id)</p>
+<pre><code># Calculate its checksum.
+icmp.set_icmp_cksum(0)
+icmp.auto_checksum = 1
+
+# Send it to the target host.
+s.sendto(ip.get_packet(), (dst, 0))
+
+# Wait for incoming replies.
+if s in select.select([s], [], [], 1)[0]:
+   reply = s.recvfrom(2000)[0]
+
+   # Use ImpactDecoder to reconstruct the packet hierarchy.
+   rip = ImpactDecoder.IPDecoder().decode(reply)
+   # Extract the ICMP packet from its container (the IP packet).
+   ricmp = rip.child()
+
+   # If the packet matches, report it to the user.
+   if rip.get_ip_dst() == src and rip.get_ip_src() == dst and icmp.ICMP_ECHOREPLY == ricmp.get_icmp_type():
+       print("Ping reply for sequence #%d" % ricmp.get_icmp_id())
+
+   time.sleep(1)
+</code></pre></div>
             </div>
         </div>
 
